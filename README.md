@@ -1,0 +1,1 @@
+# wb26-smart-price-tag
