@@ -5,6 +5,7 @@ import socket
 import json
 import machine
 import ujson
+from collections import OrderedDict
 
 # import for lora connection
 from lora_e32 import LoRaE32, Configuration
@@ -81,11 +82,17 @@ def send_lora_message(lora_module, message_data):
         return False
     
     try:
-        product_data = {
-            'name': str(message_data.get("product_name", "Product"))[:20],
-            'weight': str(message_data.get("weight", 0)),  # вес как строка
-            'price': str(message_data.get("current_price", 0))  # цена как строка
-        }
+        #product_data = {
+        #    'name': str(message_data.get("product_name", "Product"))[:20],
+        #    'weight': str(message_data.get("weight", 0)),
+        #    'price': str(message_data.get("current_price", 0))
+        #}
+        product_data = OrderedDict([
+            ('name', str(message_data.get("product_name", "Product"))[:20]),
+            ('weight', str(message_data.get("weight", 0))),
+            ('price', str(message_data.get("current_price", 0)))
+        ])
+
        
         print(f"[LORA] Подготовлены данные: {product_data}")
 
@@ -209,7 +216,7 @@ def update_price_data(new_data):
 def parse_http_request(request):
     """Parse HTTP request"""
     try:
-        request_str = request.decode("utf-8")
+        request_str = request.decode("utf-8", errors='ignore')
     except:
         try:
             request_str = request.decode("latin-1")
