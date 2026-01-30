@@ -1,0 +1,452 @@
+{% extends "base.html" %}
+
+{% block title %}Редактирование - {{ tag.name }}{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <h1 class="h3 mb-2">Редактирование ценника</h1>
+        <p class="text-muted mb-0">ID: {{ tag.id }} - {{ tag.name }}</p>
+    </div>
+    <div class="col-md-4 text-end">
+        <a href="/tag/{{ tag.id }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left me-2"></i> Назад к ценнику
+        </a>
+    </div>
+</div>
+
+<!-- Сообщения об отправке на ESP32 -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+<div class="row mb-4">
+    <div class="col-12">
+        {% for category, message in messages %}
+        {% if 'ESP32' in message or 'отправлен' in message or 'ошибка' in message or 'подключени' in message %}
+        <div class="alert alert-{{ 'success' if '✅' in message or 'успеш' in message else 'warning' if '⚠️' in message else 'danger' }} alert-dismissible fade show d-flex align-items-center" role="alert">
+            <div class="me-3">
+                {% if '✅' in message or 'успеш' in message %}
+                <i class="fas fa-check-circle fa-2x"></i>
+                {% elif '⚠️' in message %}
+                <i class="fas fa-exclamation-triangle fa-2x"></i>
+                {% elif '❌' in message or 'ошибка' in message %}
+                <i class="fas fa-times-circle fa-2x"></i>
+                {% elif '📡' in message %}
+                <i class="fas fa-wifi fa-2x"></i>
+                {% else %}
+                <i class="fas fa-info-circle fa-2x"></i>
+                {% endif %}
+            </div>
+            <div class="flex-grow-1">
+                <h5 class="alert-heading mb-1">
+                    {% if 'ESP32' in message %}Отправка на ESP32{% else %}Уведомление{% endif %}
+                </h5>
+                <div class="mb-0">{{ message|safe }}</div>
+                {% if 'IP:' in message %}
+                <small class="text-muted d-block mt-1">
+                    <i class="fas fa-network-wired me-1"></i> {{ tag.esp_ip }}
+                </small>
+                {% endif %}
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+</div>
+  {% endif %}
+{% endwith %}
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Основная информация</h5>
+            </div>
+            <div class="card-body">
+                <form id="editTagForm" method="POST" action="/tag/{{ tag.id }}/edit">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Название товара *</label>
+                            <input type="text" class="form-control" name="name"
+                                   value="{{ tag.name }}" required id="productName">
+                            <div class="form-text">Будет отправлено на ESP32</div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Цена (₽) *</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" name="current_price"
+                                       value="{{ tag.current_price }}" step="0.01" min="0" required id="currentPrice">
+                                <span class="input-group-text">₽</span>
+                            </div>
+                            <div class="form-text">Будет отправлено на ESP32</div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Вес (кг) *</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" name="weight"
+                                       value="{{ tag.weight }}" step="0.001" min="0" required id="productWeight">
+                                <span class="input-group-text">кг</span>
+                            </div>
+                            <div class="form-text">Будет отправлено на ESP32</div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Причина изменения (опционально)</label>
+                            <input type="text" class="form-control" name="change_reason"
+                                   placeholder="Изменение цены, акция..." id="changeReason">
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="/tag/{{ tag.id }}" class="btn btn-secondary me-2">
+                            <i class="fas fa-times me-2"></i> Отмена
+                        </a>
+                        <button type="submit" class="btn btn-primary" id="saveButton">
+                            <i class="fas fa-save me-2"></i> Сохранить и отправить
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0">Предпросмотр данных для ESP32</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Информация об отправке:</h6>
+                        <ul class="list-unstyled">
+                            <li class="mb-2">
+                                <i class="fas fa-microchip me-2 text-primary"></i>
+                                <strong>Устройство ID:</strong> {{ tag.id }}
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-network-wired me-2 text-primary"></i>
+                                <strong>IP адрес:</strong> {{ tag.esp_ip }}
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <!-- Информация об устройстве -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Информация об устройстве</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <small class="text-muted d-block">ID устройства:</small>
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-hashtag me-2 text-muted"></i>
+                        <strong class="font-monospace">{{ tag.id }}</strong>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <small class="text-muted d-block">IP адрес ESP32:</small>
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-network-wired me-2 text-muted"></i>
+                        <strong class="font-monospace">{{ tag.esp_ip }}</strong>
+                        <button type="button" class="btn btn-sm btn-link ms-2" onclick="copyToClipboard('{{ tag.esp_ip }}')" title="Копировать IP">
+                            <i class="far fa-copy"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Кнопки управления ESP -->
+                <div class="mt-4 pt-3 border-top">
+                    <h6 class="mb-3">Управление ESP32:</h6>
+                    <div class="d-grid gap-2">
+                        <button type="button" class="btn btn-outline-warning" onclick="showESPInfo()">
+                            <i class="fas fa-info-circle me-2"></i> Информация
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Статус -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Статус устройства</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <small class="text-muted">Заряд батареи:</small><br>
+                    <div class="d-flex align-items-center">
+                        {% if tag.battery_level < 20 %}
+                        <span class="text-danger me-2">
+                            <i class="fas fa-battery-empty"></i>
+                        </span>
+                        <strong class="text-danger">{{ tag.battery_level }}%</strong>
+                        {% elif tag.battery_level < 50 %}
+                        <span class="text-warning me-2">
+                            <i class="fas fa-battery-quarter"></i>
+                        </span>
+                        <strong class="text-warning">{{ tag.battery_level }}%</strong>
+                        {% else %}
+                        <span class="text-success me-2">
+                            <i class="fas fa-battery-full"></i>
+                        </span>
+                        <strong class="text-success">{{ tag.battery_level }}%</strong>
+                        {% endif %}
+                        <div class="progress flex-grow-1 ms-2" style="height: 8px;">
+                            <div class="progress-bar bg-{{ 'danger' if tag.battery_level < 20 else 'warning' if tag.battery_level < 50 else 'success' }}"
+                                 role="progressbar" style="width: {{ tag.battery_level }}%;"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mb-2">
+                    <small class="text-muted">Последнее обновление:</small><br>
+                    <strong>
+                        {% if tag.last_seen %}
+                        {{ tag.last_seen[11:16] }} ({{ tag.last_seen[:10] }})
+                        {% else %}
+                        Нет данных
+                        {% endif %}
+                    </strong>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Обновление предпросмотра JSON
+function updatePreview() {
+    const data = {
+        device_id: "{{ tag.id }}",
+        product_name: document.getElementById('productName').value,
+        current_price: parseFloat(document.getElementById('currentPrice').value),
+        weight: parseFloat(document.getElementById('productWeight').value),
+        battery: parseInt("{{ tag.battery_level }}"),
+        is_active: true
+    };
+
+    document.getElementById('espPreview').textContent = JSON.stringify(data, null, 2);
+}
+
+// Тестирование соединения с ESP32
+function testESPConnection() {
+    const tagId = "{{ tag.id }}";
+    const button = event?.target || document.querySelector('[onclick*="testESPConnection"]');
+
+    // Сохраняем исходное состояние кнопки
+    const originalHTML = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Проверка...';
+    button.disabled = true;
+
+    // Показываем уведомление
+    showNotification('info', 'Проверяем соединение с ESP32...');
+
+    // Отправляем запрос на тестирование
+    fetch(`/api/esp/test/${tagId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('success',
+                    `✅ Соединение с ESP32 установлено!<br>
+                     IP: ${data.ip_address}<br>
+                     Статус: HTTP ${data.status_code}`);
+
+                // Обновляем страницу через 1.5 секунды
+                setTimeout(() => {
+                    location.reload();
+                }, 1500);
+            } else {
+                showNotification('error',
+                    `❌ Не удалось подключиться к ESP32<br>
+                     IP: ${data.ip_address}<br>
+                     Ошибка: ${data.message}`);
+            }
+        })
+        .catch(error => {
+            showNotification('error',
+                `❌ Ошибка при тестировании:<br>${error}`);
+        })
+        .finally(() => {
+            // Восстанавливаем кнопку
+            button.innerHTML = originalHTML;
+            button.disabled = false;
+        });
+}
+
+// Отправка тестовых данных на ESP32
+function sendTestData() {
+    const tagId = "{{ tag.id }}";
+    const testData = {
+        product_name: "ТЕСТ: " + document.getElementById('productName').value,
+        current_price: 77.77,
+        weight: 0.777,
+        test: true
+    };
+
+    showNotification('info', 'Отправка тестовых данных на ESP32...');
+
+    fetch(`/api/esp/send-test/${tagId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(testData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('success',
+                `✅ Тестовые данные отправлены!<br>
+                 IP: ${data.ip_address}<br>
+                 Статус: HTTP ${data.status_code}`);
+        } else {
+            showNotification('warning',
+                `⚠️ Ошибка отправки теста:<br>
+                 ${data.message}`);
+        }
+    })
+    .catch(error => {
+        showNotification('error',
+            `❌ Ошибка при отправке теста:<br>${error}`);
+    });
+}
+
+// Показ информации об ESP32
+function showESPInfo() {
+    const info = `
+        <h5>Информация об устройстве</h5>
+        <table class="table table-sm">
+            <tr>
+                <td><strong>ID:</strong></td>
+                <td>{{ tag.id }}</td>
+            </tr>
+            <tr>
+                <td><strong>IP адрес:</strong></td>
+                <td>{{ tag.esp_ip }}</td>
+            </tr>
+            <tr>
+                <td><strong>Текущий товар:</strong></td>
+                <td>{{ tag.name }}</td>
+            </tr>
+            <tr>
+                <td><strong>Цена:</strong></td>
+                <td>{{ tag.current_price }} ₽</td>
+            </tr>
+            <tr>
+                <td><strong>Вес:</strong></td>
+                <td>{{ tag.weight }} кг</td>
+            </tr>
+            <tr>
+                <td><strong>Заряд батареи:</strong></td>
+                <td>{{ tag.battery_level }}%</td>
+            </tr>
+            <tr>
+                <td><strong>Последнее обновление:</strong></td>
+                <td>{% if tag.last_seen %}{{ tag.last_seen[11:16] }} ({{ tag.last_seen[:10] }}){% else %}Нет данных{% endif %}</td>
+            </tr>
+        </table>
+        <p class="text-muted small">Используйте кнопку "Проверить соединение" для проверки доступности устройства.</p>
+    `;
+
+    // Создаем модальное окно
+    const modalHTML = `
+        <div class="modal fade" id="infoModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Информация об устройстве</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        ${info}
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Удаляем старую модалку если есть
+    const oldModal = document.getElementById('infoModal');
+    if (oldModal) oldModal.remove();
+
+    // Добавляем новую
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+    // Показываем
+    const modal = new bootstrap.Modal(document.getElementById('infoModal'));
+    modal.show();
+}
+
+// Обновляем предпросмотр при изменении полей
+document.addEventListener('DOMContentLoaded', function() {
+    // Инициализируем предпросмотр
+    updatePreview();
+
+    // Обновляем при изменении полей
+    ['productName', 'currentPrice', 'productWeight'].forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.addEventListener('input', updatePreview);
+            element.addEventListener('change', updatePreview);
+        }
+    });
+
+    // Добавляем обработчик для кнопки сохранения
+    const saveButton = document.getElementById('saveButton');
+    if (saveButton) {
+        saveButton.addEventListener('click', function(e) {
+            if (document.getElementById('editTagForm').checkValidity()) {
+                saveButton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Отправка...';
+                saveButton.disabled = true;
+
+                // Показываем уведомление
+                showNotification('info', 'Сохранение данных и отправка на ESP32...');
+            }
+        });
+    }
+});
+</script>
+
+<style>
+    #espPreview {
+        font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        white-space: pre-wrap;
+        word-break: break-all;
+    }
+
+    .alert .fa-2x {
+        font-size: 1.5em;
+    }
+
+    .position-fixed {
+        animation: slideIn 0.3s ease-out;
+    }
+
+    @keyframes slideIn {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+
+    .battery-progress {
+        height: 8px;
+        border-radius: 4px;
+    }
+</style>
+{% endblock %}
