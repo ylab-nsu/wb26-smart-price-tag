@@ -5,32 +5,34 @@ from esp_sender import esp_sender
 from esp_connector import esp_connector
 from config import ESP_DEVICES
 
+#
+# Основной код для веб интерфейса
+#
+
 app = Flask(__name__)
 app.secret_key = 'dev-secret-key-123'
 
-# Заранее заданные данные ценников (только необходимые поля)
+# Заранее заданные данные ценников 
 PRICE_TAGS = [
     {
         "id": 11,
         "name": "Shluz",
         "current_price": 0,
-        "weight": 0.5,  # Вес в кг
+        "weight": 0.5,
         "battery_level": 85,
         "last_seen": datetime.now().isoformat(),
-        "esp_ip": "10.133.210.157"  # РЕАЛЬНЫЙ IP ESP32
+        "esp_ip": "10.133.210.157"  # IP ESP32
     }
 ]
 
-# Пользователи (только admin)
+# Пользователи 
 USERS = {
     "admin": {"password": "admin123", "role": "admin"}
 }
 
-# Текущая сессия (простая имитация)
 current_user = None
 user_role = None
 
-# Функция для сортировки данных
 def sort_tags(tags, sort_by='name', sort_order='asc'):
     """Сортировка списка ценников"""
     reverse = (sort_order == 'desc')
@@ -103,18 +105,15 @@ def tags_list():
         return redirect('/login')
     
     tags = PRICE_TAGS.copy()
-    
-    # Фильтрация
+        
     search = request.args.get('search', '')
     
-    # Сортировка
     sort_by = request.args.get('sort_by', 'name')
     sort_order = request.args.get('sort_order', 'asc')
     
     if search:
         tags = [t for t in tags if search.lower() in t['name'].lower()]
     
-    # Применяем сортировку
     tags = sort_tags(tags, sort_by, sort_order)
     
     return render_template('tags.html',
@@ -178,7 +177,6 @@ def edit_tag(tag_id):
         tag['current_price'] = new_current_price
         tag['weight'] = new_weight
         
-        # Флаг, были ли изменения
         any_changes = any(fields_changed.values())
         
         if not any_changes:
@@ -200,13 +198,13 @@ def edit_tag(tag_id):
         if changed_fields_list:
             flash(f'Изменения сохранены: {", ".join(changed_fields_list)}', 'success')
         
-        # === ОТПРАВКА НА ESP32 (если есть изменения) ===
+        # отправка на шлюз (ESP32)
         try:
             print(f"\n{'='*60}")
             print(f"ОТПРАВКА НА ESP32 ({tag['esp_ip']})")
             print(f"{'='*60}")
             
-            # Формируем данные для ESP32 (убраны ненужные поля)
+            # Формируем данные для ESP32
             esp_data = {
                 "device_id": str(tag_id),
                 "product_name": tag['name'],
@@ -230,7 +228,6 @@ def edit_tag(tag_id):
                 # Обновляем время последнего обновления
                 tag['last_seen'] = datetime.now().isoformat()
                 
-                # Обновляем батарею из ответа
                 if 'response_data' in send_result:
                     resp = send_result['response_data']
                     if 'battery' in resp:
@@ -243,7 +240,6 @@ def edit_tag(tag_id):
                 
                 error_msg = send_result.get('message', 'Неизвестная ошибка')
                 
-                # Уточняем сообщение об ошибке
                 if 'connection_error' in str(send_result.get('error', '')):
                     error_msg = f'Не удалось подключиться к ESP32'
                 elif 'timeout' in str(send_result.get('error', '')):
@@ -262,7 +258,7 @@ def edit_tag(tag_id):
         
         return redirect(f'/tag/{tag_id}')
     
-    # GET запрос - показываем форму
+    # GET запрос 
     return render_template('tag_edit.html',
                          tag=tag,
                          current_user=current_user,
@@ -279,7 +275,6 @@ def test_esp_connection(tag_id):
     if not tag:
         return jsonify({'error': 'Ценник не найден'}), 404
     
-    # Если POST запрос - получаем endpoint из данных
     if request.method == 'POST':
         data = request.json or {}
         endpoint = data.get('endpoint', '/api/price')
@@ -305,7 +300,6 @@ def test_esp_connection(tag_id):
     if test_result['success']:
         tag['last_seen'] = datetime.now().isoformat()
         
-        # Flash сообщение об успехе
         success_message = f"Соединение с ESP32 установлено! IP: {tag['esp_ip']}"
         if test_result.get('status_code'):
             success_message += f", Статус: HTTP {test_result['status_code']}"
@@ -318,7 +312,6 @@ def test_esp_connection(tag_id):
         flash(success_message, 'success')
         print(f"УСПЕШНОЕ СОЕДИНЕНИЕ!")
     else:
-        # Flash сообщение об ошибке
         error_message = f"Не удалось подключиться к ESP32 ({tag['esp_ip']})"
         flash(error_message, 'danger')
         print(f"ОШИБКА СОЕДИНЕНИЯ!")
@@ -337,7 +330,7 @@ def send_test_data_to_esp(tag_id):
     if not tag:
         return jsonify({'error': 'Ценник не найден'}), 404
     
-    # Данные для отправки (убраны ненужные поля)
+    # Данные для отправки
     data = request.json or {}
     
     test_data = {
@@ -353,25 +346,22 @@ def send_test_data_to_esp(tag_id):
     if result['success']:
         tag['last_seen'] = datetime.now().isoformat()
         
-        # Flash сообщение об успехе
         success_msg = f"Тестовые данные отправлены на ESP32! IP: {tag['esp_ip']}"
         if result.get('status_code'):
             success_msg += f", Статус: HTTP {result['status_code']}"
         flash(success_msg, 'success')
         
-        # Обновляем батарею если есть
         if 'response_data' in result:
             resp = result['response_data']
             if 'battery' in resp:
                 tag['battery_level'] = resp['battery']
     else:
-        # Flash сообщение об ошибке
         error_msg = f"Ошибка отправки теста на ESP32 ({tag['esp_ip']})"
         flash(error_msg, 'danger')
     
     return jsonify(result)
 
-# Добавляем новый endpoint для проверки статуса ESP32
+
 @app.route('/api/esp/status/<int:tag_id>')
 def esp_status(tag_id):
     """API для получения статуса ESP32 устройства"""
@@ -381,7 +371,7 @@ def esp_status(tag_id):
     status = esp_connector.get_device_status(str(tag_id))
     return jsonify(status)
 
-# Добавляем endpoint для сканирования сети
+
 @app.route('/api/esp/scan')
 def scan_esp_devices():
     """API для сканирования ESP32 устройств в сети"""
@@ -395,7 +385,7 @@ def scan_esp_devices():
         "devices": devices
     })
 
-# Добавляем endpoint для отправки команд дисплею
+
 @app.route('/api/esp/command', methods=['POST'])
 def send_esp_command():
     """API для отправки команд на ESP32"""
@@ -413,7 +403,7 @@ def send_esp_command():
     result = esp_connector.send_display_command(tag_id, command, params)
     return jsonify(result)
 
-# Массовое обновление цен
+
 @app.route('/batch-update', methods=['POST'])
 def batch_update():
     if not current_user:
@@ -483,7 +473,7 @@ def batch_update():
         "results": results
     })
 
-# API для получения данных
+
 @app.route('/api/tags')
 def api_tags():
     if not current_user:
@@ -542,7 +532,7 @@ if __name__ == '__main__':
     print("СИСТЕМА УПРАВЛЕНИЯ ЭЛЕКТРОННЫМИ ЦЕННИКАМИ")
     print("=" * 60)
     print("Веб-интерфейс: http://localhost:5000")
-    print("Доступ: admin / admin123")
+    print("Доступ для тестирования: admin / admin123")
     print("=" * 60)
     print(f"Загружено {len(PRICE_TAGS)} ценников")
     print("=" * 60)
