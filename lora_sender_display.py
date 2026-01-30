@@ -56,7 +56,7 @@ def init_lora():
         
         # Конфигурация
         configuration_to_set = Configuration('433T20D')
-        configuration_to_set.ADDL = 0x02  # Адрес отправителя
+        configuration_to_set.ADDL = 0x02
         configuration_to_set.OPTION.fixedTransmission = FixedTransmission.TRANSPARENT_TRANSMISSION
         code, confSetted = lora.set_configuration(configuration_to_set)
         print(f"Set configuration: {ResponseStatusCode.get_description(code)}")
@@ -72,7 +72,7 @@ def init_lora():
         print(f"[LORA] Error: {e}")
         return None
 
-# ==================== LORA SEND FUNCTION ====================
+
 def send_lora_message(lora_module, message_data):
     """
     Send data via LoRa - ОБНОВЛЕНО для нового формата данных
@@ -82,11 +82,6 @@ def send_lora_message(lora_module, message_data):
         return False
     
     try:
-        #product_data = {
-        #    'name': str(message_data.get("product_name", "Product"))[:20],
-        #    'weight': str(message_data.get("weight", 0)),
-        #    'price': str(message_data.get("current_price", 0))
-        #}
         product_data = OrderedDict([
             ('name', str(message_data.get("product_name", "Product"))[:20]),
             ('weight', str(message_data.get("weight", 0))),
@@ -103,7 +98,7 @@ def send_lora_message(lora_module, message_data):
         print(f"[LORA] Отправляем по LoRa: {product_str}")
         print(f"[LORA] Размер сообщения: {len(product_str)} байт")
     
-        # Отправка broadcast сообщения (строки)
+        # Отправка сообщения
         code = lora_module.send_broadcast_message(23, product_str)
         print(f"[LORA] Статус отправки: {ResponseStatusCode.get_description(code)}")
         print(f"[LORA] Send code: {code}")
@@ -115,7 +110,7 @@ def send_lora_message(lora_module, message_data):
             print(f"[LORA] Failed: {ResponseStatusCode.get_description(code)}")
             return False
     
-        utime.sleep(2)  # Пауза 2 секунды между сообщениями
+        utime.sleep(2)
 
         print("All messages sent!")
             
@@ -125,7 +120,6 @@ def send_lora_message(lora_module, message_data):
 
 
 
-# ==================== CONNECT TO WIFI ====================
 def connect_wifi():
     print("\n[WIFI] Connecting to:", WIFI_SSID)
     
@@ -152,17 +146,13 @@ def connect_wifi():
         print("\n[WIFI] Failed")
         return None, None
 
-# ==================== DATA UPDATE FUNCTION ====================
+
 def update_price_data(new_data):
-    """
-    Update device data - ОБНОВЛЕНО для нового формата
-    """
     update_count = 0
     
     print(f"[DATA] New data received: {new_data}")
     
     for key, value in new_data.items():
-        # ОБНОВЛЕНО: добавляем поддержку новых полей
         if key == "product_name" and key in price_data:
             old_value = price_data[key]
             price_data[key] = str(value)
@@ -178,7 +168,7 @@ def update_price_data(new_data):
             except:
                 print(f"[DATA] Bad format for {key}: {value}")
                 
-        elif key == "weight" and key in price_data:  # ДОБАВЛЕНО новое поле
+        elif key == "weight" and key in price_data:
             try:
                 old_value = price_data[key]
                 price_data[key] = float(value)
@@ -187,7 +177,7 @@ def update_price_data(new_data):
             except:
                 print(f"[DATA] Bad format for {key}: {value}")
                 
-        elif key == "battery" and key in price_data:  # Переименовано с "battery_level"
+        elif key == "battery" and key in price_data:
             try:
                 old_value = price_data[key]
                 price_data[key] = int(value)
@@ -197,11 +187,9 @@ def update_price_data(new_data):
                 print(f"[DATA] Bad format for {key}: {value}")
                 
         elif key == "device_id":
-            # Игнорируем device_id из запроса, используем свой
             pass
                 
         else:
-            # Оставляем старые поля без изменений
             pass
     
     if update_count > 0:
@@ -212,7 +200,7 @@ def update_price_data(new_data):
         print("[DATA] No fields updated")
         return False
 
-# ==================== WEB SERVER ====================
+
 def parse_http_request(request):
     """Parse HTTP request"""
     try:
@@ -228,7 +216,6 @@ def parse_http_request(request):
     if not lines:
         return None, None, None, None
     
-    # Parse request line
     request_line = lines[0].split()
     if len(request_line) < 2:
         return None, None, None, None
@@ -236,7 +223,6 @@ def parse_http_request(request):
     method = request_line[0]
     path = request_line[1]
     
-    # Parse headers
     headers = {}
     for i in range(1, len(lines)):
         if not lines[i]:
@@ -245,7 +231,6 @@ def parse_http_request(request):
             key, value = lines[i].split(": ", 1)
             headers[key.lower()] = value
     
-    # Parse body
     body = None
     if "\r\n\r\n" in request_str:
         body_str = request_str.split("\r\n\r\n", 1)[1]
@@ -254,8 +239,8 @@ def parse_http_request(request):
     
     return method, path, headers, body
 
+
 def send_http_response(client, status_code, content_type, content):
-    """Send HTTP response"""
     response = f"HTTP/1.1 {status_code}\r\n"
     response += "Content-Type: " + content_type + "\r\n"
     response += "Content-Length: " + str(len(content)) + "\r\n"
@@ -268,8 +253,8 @@ def send_http_response(client, status_code, content_type, content):
     except Exception as e:
         print(f"[HTTP] Send error: {e}")
 
+
 def handle_request(client, request, lora_module):
-    """Handle HTTP request - ОБНОВЛЕНО для POST запросов"""
     try:
         method, path, headers, body = parse_http_request(request)
         
@@ -281,7 +266,6 @@ def handle_request(client, request, lora_module):
         if body:
             print(f"[HTTP] Body length: {len(body)} bytes")
         
-        # Root page - ОБНОВЛЕНО для нового формата данных
         if path == "/":
             html = f"""<html>
 <head><title>ESP32 Price Tag - {DEVICE_ID}</title></head>
@@ -317,7 +301,7 @@ def handle_request(client, request, lora_module):
                 "lora_ready": lora_module is not None,
                 "lora_channel": LORA_CHANNEL if lora_module else None,
                 "timestamp": time.time(),
-                "data": price_data  # ДОБАВЛЕНО текущие данные
+                "data": price_data
             }
             
             response_json = json.dumps(status)
@@ -331,7 +315,7 @@ def handle_request(client, request, lora_module):
                 send_http_response(client, "200 OK", "application/json", response_json)
                 return
             
-            elif method in ["POST", "PUT"]:  # ДОБАВЛЕНО поддержка POST
+            elif method in ["POST", "PUT"]:
                 if not body:
                     send_http_response(client, "400 Bad Request", "application/json", 
                                       json.dumps({"error": "No data provided"}))
@@ -360,7 +344,7 @@ def handle_request(client, request, lora_module):
                         "lora_forwarded": lora_sent,
                         "received_data": data,
                         "current_data": price_data,
-                        "battery": price_data["battery"],  # Возвращаем текущий заряд батареи
+                        "battery": price_data["battery"],
                         "timestamp": time.time()
                     }
                     
@@ -381,7 +365,6 @@ def handle_request(client, request, lora_module):
                                       json.dumps({"error": error_msg}))
                     return
         
-        # Not found
         else:
             send_http_response(client, "404 Not Found", "text/plain", "Not found")
             
@@ -397,7 +380,7 @@ def start_web_server(ip, lora_module, port=80):
     server = socket.socket()
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server.bind(addr)
-    server.listen(5)  # Allow more connections
+    server.listen(5)
     
     print("[SERVER] Ready")
     print(f"[SERVER] API: http://{ip}/api/price")
@@ -408,7 +391,7 @@ def start_web_server(ip, lora_module, port=80):
             client, addr = server.accept()
             print(f"\n[SERVER] Connection from: {addr[0]}")
             
-            client.settimeout(10.0)  # Увеличили таймаут
+            client.settimeout(10.0) 
             
             try:
                 # Читаем запрос
@@ -420,9 +403,7 @@ def start_web_server(ip, lora_module, port=80):
                             break
                         request += chunk
                         
-                        # Проверяем, получили ли мы полные заголовки
                         if b"\r\n\r\n" in request:
-                            # Проверяем Content-Length если есть
                             try:
                                 request_str = request.decode("utf-8")
                                 headers_part = request_str.split("\r\n\r\n")[0]
@@ -433,7 +414,6 @@ def start_web_server(ip, lora_module, port=80):
                                         content_length = int(line.split(":", 1)[1].strip())
                                         break
                                 
-                                # Если есть тело, читаем его полностью
                                 if content_length > 0:
                                     body_received = len(request) - len(headers_part) - 4
                                     while body_received < content_length:
@@ -474,7 +454,8 @@ def start_web_server(ip, lora_module, port=80):
             except:
                 pass
 
-# ==================== MAIN FUNCTION ====================
+
+
 def main():
     print("\n" + "="*50)
     print("ESP32 Price Tag with LoRa")
@@ -506,6 +487,6 @@ def main():
         time.sleep(5)
         machine.reset()
 
-# ==================== START ====================
+
 if __name__ == "__main__":
     main()
